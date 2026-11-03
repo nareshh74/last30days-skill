@@ -298,7 +298,47 @@ def search(
         for i, post in enumerate(unique):
             post["id"] = f"R{i + 1}"
         _log(f"{len(unique)} posts (t={time_filter}, {len(subs)} targeted subs)")
+        if not unique:
+            unique = _searxng_fallback(query, limit)
         return unique
     except Exception as e:  # defensive: discovery must never raise into the pipeline
         _log(f"search failed: {e}")
         return []
+
+
+def _searxng_fallback(query: str, limit: int) -> List[Dict[str, Any]]:
+    """Reddit blocks direct scraping from some IPs; use a SearXNG site: search instead."""
+    import os
+    base = os.environ.get("LAST30DAYS_SEARXNG_URL") or os.environ.get("SEARXNG_URL") or ""
+    if not base:
+        try:
+            from . import env
+            base = str(env.get_config().get("LAST30DAYS_SEARXNG_URL") or "")
+        except Exception:
+            base = ""
+    if not base:
+        return []
+    url = f"{base.rstrip('/')}/search?{urlencode({'q': f'site:reddit.com {query}', 'format': 'json'})}"
+    try:
+        data = http.get(url, headers={"Accept": "application/json"}, timeout=15, retries=2)
+    except Exception as e:
+        _log(f"searxng fallback failed: {e}")
+        return []
+    posts: List[Dict[str, Any]] = []
+    for r in (data.get("results", []) if isinstance(data, dict) else []):
+        m = re.search(r"reddit\.com/r/([^/]+)/comments/([a-z0-9]+)", r.get("url", ""))
+        if not m or any(x["metadata"]["post_id"] == m.group(2) for x in posts):
+            continue
+        title = str(r.get("title") or "")
+        posts.append({
+            "id": f"R{len(posts) + 1}", "title": title, "url": r["url"].split("?", 1)[0],
+            "score": 0, "num_comments": 0, "subreddit": m.group(1), "created_utc": None,
+            "author": "", "selftext": str(r.get("content") or "")[:500], "date": None,
+            "engagement": {"score": 0, "num_comments": 0, "upvote_ratio": None},
+            "relevance": round(token_overlap_relevance(query, title), 3),
+            "why_relevant": "Reddit via SearXNG", "metadata": {"post_id": m.group(2)},
+        })
+        if len(posts) >= limit:
+            break
+    _log(f"searxng fallback: {len(posts)} posts")
+    return posts

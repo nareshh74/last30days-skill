@@ -267,6 +267,12 @@ def search_reddit_public(
         List of normalized item dicts matching ScrapeCreators output format.
         Empty list on total failure (so SC backup can engage).
     """
+    from . import scoped_firefox
+    if scoped_firefox.reddit_available():
+        try:
+            return scoped_firefox.reddit_search(topic, from_date, to_date, depth=depth)
+        except Exception as e:
+            sys.stderr.write(f"[Reddit] Firefox session failed ({e}); falling back to keyless\n")
     from . import reddit_keyless
     return reddit_keyless.search_and_enrich(
         topic, from_date, to_date, depth=depth, subreddits=subreddits,

@@ -406,6 +406,9 @@ def _run_ytdlp(
     A keyed transcript checks the bot-check flag again after the wait. It may
     have been clear when the worker queued and set while the worker was waiting.
     """
+    from . import scoped_firefox  # opt-in, YouTube-domain-only Firefox session
+    cmd = scoped_firefox.wrapper_cmd(cmd)
+
     def _abort_if_blocked() -> None:
         if abort_if_blocked and _youtube_transcripts_blocked():
             raise _YtdlpBlocked()
