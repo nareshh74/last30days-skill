@@ -1,0 +1,1 @@
+Opt-in `LAST30DAYS_FIREFOX_PROFILE` gives YouTube (yt-dlp) and Reddit a domain-scoped Firefox session, falls back to keyless Reddit on a 401/403, and uses a SearXNG `site:reddit.com` search (`LAST30DAYS_SEARXNG_URL`) when keyless Reddit is blocked. The yt-dlp wrapper resolves a Python that has yt_dlp on Windows.
